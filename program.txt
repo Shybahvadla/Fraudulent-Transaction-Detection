@@ -1,0 +1,97 @@
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn.preprocessing import LabelEncoder
+
+# Load your dataset (replace 'cleaned_dataset2.csv' with the actual file name)
+data = pd.read_csv('cleaned_dataset2.csv')
+
+
+# Convert the 'Date' column to datetime format
+data['Date'] = pd.to_datetime(data['Date'], errors='coerce')
+
+# Check for any rows where date conversion failed
+if data['Date'].isna().any():
+    print("Rows with invalid date conversion:")
+    print(data[data['Date'].isna()])
+
+# Add time-based features (e.g., Year, Month, Day)
+data['Year'] = data['Date'].dt.year
+data['Month'] = data['Date'].dt.month
+data['Day'] = data['Date'].dt.day
+
+# Drop the original 'Date' column
+data = data.drop(columns=['Date'])
+
+# Convert 'Time' from 'HH:MM:SS' format to total seconds
+data['Time'] = data['Time'].apply(lambda x: sum(int(i) * 60 ** j for j, i in enumerate(x.split(':')[::-1])))
+
+# Encode categorical variables
+label_encoder = LabelEncoder()
+categorical_columns = [
+    'Sender_account', 'Receiver_account', 'Sender_bank_location',
+    'Receiver_bank_location', 'Payment_type',
+    'Payment_currency', 'Received_currency'
+]
+
+for col in categorical_columns:
+    data[col] = label_encoder.fit_transform(data[col])
+
+# Drop the 'Laundering_type' column
+#data = data.drop(columns=['Laundering_type'])
+
+# Split the data into training and testing sets
+train_data = data[data['Month'] <= 8]  # First 8 months for training
+test_data = data[data['Month'] > 8]    # Remaining months for testing
+
+# Define features (X) and target (y)
+#X_train = train_data.drop(columns=['Is_laundering', 'Laundering_type'])
+#y_train = train_data['Is_laundering']
+
+X_test = test_data.drop(columns=['Is_laundering','Laundering_type'])
+y_test = test_data['Is_laundering']
+
+# Initialize the Random Forest model with regularization parameters
+rf_model = RandomForestClassifier(
+    n_estimators=100,
+    max_depth=10,            # Limit the depth of each tree
+    min_samples_split=10,    # Minimum samples required to split an internal node
+    min_samples_leaf=5,      # Minimum samples required at a leaf node
+    max_features='sqrt',     # Use a subset of features for splitting
+    random_state=42
+)
+
+# Train the model
+rf_model.fit(X_train, y_train)
+
+# Make predictions
+y_train_pred = rf_model.predict(X_train)
+y_test_pred = rf_model.predict(X_test)
+
+# Evaluate the model on training data
+train_accuracy = accuracy_score(y_train, y_train_pred)
+train_confusion_matrix = confusion_matrix(y_train, y_train_pred)
+train_classification_report = classification_report(y_train, y_train_pred)
+
+# Evaluate the model on testing data
+test_accuracy = accuracy_score(y_test, y_test_pred)
+test_confusion_matrix = confusion_matrix(y_test, y_test_pred)
+test_classification_report = classification_report(y_test, y_test_pred)
+
+# Display the results
+print(f"Training Accuracy: {train_accuracy:.4f}")
+print("Training Confusion Matrix:")
+print(train_confusion_matrix)
+print("Training Classification Report:")
+print(train_classification_report)
+
+print(f"Testing Accuracy: {test_accuracy:.4f}")
+print("Testing Confusion Matrix:")
+print(test_confusion_matrix)
+print("Testing Classification Report:")
+print(test_classification_report)
+
+
+
